@@ -1,0 +1,134 @@
+---
+title: 'Supervised Learning: KNN'
+author: "Ismael Isak"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# K-Nearest Neighbours
+
+## Get Data
+
+We'll use the ISLR package to get the data, 'r install.packages('ISLR',repos = 'http://cran.us.r-project.org')'
+
+```{r}
+library(ISLR)
+```
+
+We will apply the KNN approach to the Caravan data set, which is part of the ISLR library. This data set includes 85 predictors that measure demographic characteristics for 5,822 individuals. The response variable is Purchase, which indicates whether or not a given individual purchases a Caravan insurance policy. In this data set, only 6% of people purchased caravan insurance.
+Let's look at the structure:
+
+```{r}
+str(Caravan)
+
+summary(Caravan$Purchase)
+```
+
+## Cleaning Data
+
+Since we are just using this data as a simple example, we won't worry about feature engineering. Let's just remove any NA values by dropping the rows with them.
+
+```{r}
+any(is.na(Caravan))
+```
+
+## Standardize Variables
+
+Because the KNN classifier predicts the class of a given test observation by identifying the observations that are nearest to it, the scale of the variables matters. Any variables that are on a large scale will have a much larger effect on the distance between the observations, and hence on the KNN classifier, than variables that are on a small scale.
+For example, let's check out the variance of two features:
+
+```{r}
+var(Caravan[,1])
+
+var(Caravan[,2])
+```
+
+Clearly the scales are different! We are now going to standarize all the X variables except Y (Purchase). The Purchase variable is in column 86 of our dataset, so let’s save it in a separate variable because the knn() function needs it as a separate argument.
+
+```{r}
+# save the Purchase column in a separate variable
+purchase <- Caravan[,86]
+
+# Standarize the dataset using "scale()" R function
+standardized.Caravan <- scale(Caravan[,-86])
+
+
+var(standardized.Caravan[,1])
+
+var(standardized.Caravan[,2])
+```
+
+We can see that now that all independent variables (X’s) have a mean of 1 and standard deviation of 0. Great, then let’s divide our dataset into testing and training data. We'll just do a simple split of the first 1000 rows as a test set:
+
+```{r}
+# First 100 rows for test set
+test.index <- 1:1000
+test.data <- standardized.Caravan[test.index,]
+test.purchase <- purchase[test.index]
+
+# Rest of data for training
+train.data <- standardized.Caravan[-test.index,]
+train.purchase <- purchase[-test.index]
+```
+
+## Using KNN
+
+Rememeber that we are trying to come up with a model to predict whether someone will purchase or not. We will use the knn() function to do so, and we will focus on 4 of its arguments that we need to specify. The first argument is a data frame that contains the training data set(remember that we don’t have the Y here), the second argument is a data frame that contains the testing data set (again no Y variable), the third argument is the train.purchase column (Y) that we save earlier, and the fourth argument is the k (how many neighbors). Let’s start with k = 1. knn() function returns a vector of predicted Y’s.
+
+```{r}
+library(class)
+
+set.seed(101)
+predicted.purchase <- knn(train.data,test.data,train.purchase,k=1)
+head(predicted.purchase)
+```
+
+Now let’s evaluate the model we trained and see our misclassification error rate.
+
+```{r}
+mean(test.purchase != predicted.purchase)
+```
+
+## Choosing K Value
+
+Let's see what happens when we choose a different K value:
+
+```{r}
+predicted.purchase <- knn(train.data,test.data,train.purchase,k=3)
+mean(test.purchase != predicted.purchase)
+
+predicted.purchase <- knn(train.data,test.data,train.purchase,k=5)
+mean(test.purchase != predicted.purchase)
+
+predicted.purchase = NULL
+error.rate = NULL
+
+for(i in 1:20){
+    set.seed(101)
+    predicted.purchase = knn(train.data,test.data,train.purchase,k=i)
+    error.rate[i] = mean(test.purchase != predicted.purchase)
+}
+print(error.rate)
+```
+
+## Elbow Method
+We can plot out the various error rates for the K values. We should see an "elbow" indicating that we don't get a decrease in error rate for using a higher K. This is a good cut-off point:
+
+```{r}
+library(ggplot2)
+
+k.values <- 1:20
+
+error.df <- data.frame(error.rate,k.values)
+
+error.df
+
+ggplot(error.df,aes(x=k.values,y=error.rate)) + geom_point()+ geom_line(lty="dotted",color='red')
+```

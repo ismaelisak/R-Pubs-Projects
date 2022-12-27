@@ -1,0 +1,91 @@
+---
+title: "Clustering"
+author: "Ismael Isak"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Hierarchical Cluster Analysis
+
+```{r}
+crime <- read.csv("~/GitHub/R-Pubs-Projects/Data/crimes.csv")
+library(stats)
+```
+
+We will cluster the communities by the following variables: murders, rapes, robberies, assaults, burglaries, larcenies, auto thefts, arsons, non violent crimes (all of them per 100,000 population)
+
+Create a new data set with the clustering variables
+
+```{r}
+crime_work <- crime[,-1]
+```
+
+Add row names
+
+```{r}
+rownames(crime_work) <- crime$communityname
+```
+
+Compute the distance matrix
+
+```{r}
+dm <- dist(crime_work, method = "euclidean")
+```
+
+Create the clustering model using the hclust function
+
+```{r}
+model <- hclust(dm, method = "ward.D")
+```
+
+Plot the model (as a dendrogram)
+
+```{r}
+plot(model, labels=rownames(crime_work))
+```
+
+Get cluster membership for each case (community) in the case of 3 clusters
+
+```{r}
+member <- cutree(model, k=3)
+
+member
+```
+
+Visualize clusters on the dendrogram
+
+```{r}
+plot(model, labels=rownames(crime_work))
+rect.hclust(model, k=2, border="red")
+```
+
+Compute some summary data for each cluster
+
+Add a cluster membership variable to the data frame
+
+```{r}
+crime2 <- cbind(crime, cluster3 = member)
+```
+
+Compute the mean of each clustering variable in each cluster
+
+```{r}
+require(dplyr)
+
+crimesumm <- crime2 %>%
+  group_by(cluster3) %>%
+  summarise(across(c(murdPerPop, rapesPerPop, robbbPerPop, assaultPerPop, burglPerPop,
+                   larcPerPop, autoTheftPerPop, arsonsPerPop, nonViolPerPop), .fns = mean, .names = NULL))
+```
+
+Get the list of communities in each cluster
+
+```{r}
+split(crime2$communityname, factor(crime2$cluster3))
+```

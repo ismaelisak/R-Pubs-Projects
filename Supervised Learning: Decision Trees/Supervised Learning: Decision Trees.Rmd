@@ -1,0 +1,247 @@
+---
+title: 'Supervised Learning: Decision Trees'
+author: "Ismael Isak"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Decision Trees
+
+## Regression Trees
+
+Growing a regression tree using annonymous company employee data available on Github.
+
+```{r}
+cp <- read.csv("~/GitHub/R-Pubs-Projects/Data/company2.csv")
+```
+
+We will predict the employees' salaries based on the following independent variables:
+
+gender, education level, job and job time
+
+```{r}
+require(rpart)
+
+require(rpart.plot)
+```
+
+Create the training set and the test set
+
+```{r}
+i1 <- sample(474, 237)
+
+cp_train <- cp[i1, 1:5]
+
+cp_test <- cp[-i1, 1:5]
+```
+
+
+Grow the regression tree with the rpart() function. The method parameter must be set to "anova" 
+
+The rpart() function has built-in cross validation. It performs a 10-fold cross-validation
+
+```{r}
+fit1 <- rpart(salary~., data = cp_train, method = "anova")
+```
+
+Plot the tree with the prp() function
+
+```{r}
+prp(fit1)
+```
+
+Plot the tree with the rpart.plot() function
+
+```{r}
+rpart.plot(fit1)
+```
+
+
+Print the complexity parameter table
+
+```{r}
+printcp(fit1)
+```
+
+Compute the goodness-of-fit in the training set
+
+```{r}
+pred1 <- predict(fit1, cp_train)
+
+pred1[1:10]
+
+mse1 <- sum((pred1 - cp_train$salary)^2)/237
+
+var1.y <- sum((cp_train$salary - mean(cp_train$salary))^2)/236
+
+rsq1 <- 1 - mse1/var1.y
+
+rsq1
+```
+
+
+Compute the goodness-of-fit in the TEST set
+
+```{r}
+pred2 <- predict(fit1, cp_test)
+
+mse2 <- sum((pred2 - cp_test$salary)^2)/237
+
+var2.y <- sum((cp_test$salary - mean(cp_test$salary))^2)/236
+
+rsq2 <- 1 - mse2/var2.y
+
+rsq2
+```
+
+
+## Classification Tree
+
+Growing a classification tree
+
+```{r}
+phone <- read.csv("~/Desktop/BUAN 6356/Data/phone.csv")
+```
+
+
+We will predict whether a customer will abandon the company the target variable is churn (1 - yes, 0 - no) and the predictors are tenure, age, income, education and family members
+
+```{r}
+require(rpart)
+
+require(rpart.plot)
+```
+
+Create the training set and the test set
+
+```{r}
+i2 <- sample(1000, 500)
+
+phone_train <- phone[i2,]
+
+phone_test <- phone[-i2,]
+```
+
+Grow the classification tree with the rpart() function. The method parameter must be set to "class"
+
+```{r}
+fit2 <- rpart(churn~., data = phone_train, method = "class")
+```
+
+Plot the tree
+
+```{r}
+prp(fit2)
+
+rpart.plot(fit2)
+```
+
+Print the CP table
+
+```{r}
+printcp(fit2)
+```
+
+Compute the predictive accuracy in the training set. The type parameter must be set to "class"
+
+```{r}
+pred3 <- predict(fit2, phone_train, type = "class")
+
+mean(pred3 == phone_train$churn)
+```
+
+Compute the predictive accuracy in the test set
+
+```{r}
+pred4 <- predict(fit2, phone_test, type = "class")
+
+mean(pred4 == phone_test$churn)
+```
+
+
+## Prune Regression
+
+We will prune the regression tree we have grown in the previous lecture, using the cost complexity method and compute the prediction accuracy of the initial tree in the TEST set
+
+```{r}
+pred1 <- predict(fit1, cp_train)
+
+pred1[1:10]
+
+mse1 <- sum((pred1 - cp_train$salary)^2)/237
+
+var1.y <- sum((cp_train$salary - mean(cp_train$salary))^2)/236
+
+rsq1 <- 1 - mse1/var1.y
+
+rsq1
+```
+
+Print the complexity parameter table to identify the lower cross-validation error
+
+```{r}
+printcp(fit1)
+```
+
+To prune the tree we use the prune() function this function has two main arguments: the tree (fit) and the complexity parameter value
+
+Extract the cp value corresponding to the lowest cross-validation error (xerror)
+
+```{r}
+ocp <- fit1$cptable[which.min(fit1$cptable[,"xerror"]),"CP"]
+
+ocp
+```
+
+### Prune the tree
+
+```{r}
+prfit <- prune(fit1, ocp)
+
+rpart.plot(prfit)
+```
+
+### Compute the prediction accuracy for our simplified tree
+
+```{r}
+prpred <- predict(prfit, cp_test)
+
+mse <- sum((prpred - cp_test$salary)^2)/237
+
+var.y <- sum((cp_test$salary - mean(cp_test$salary))^2)/236
+
+pr_rsq <- 1 - mse/var.y
+
+pr_rsq
+```
+
+### Prune with a particular cp value to see whether we can get a good prediction accuracy with a less complex tree
+
+```{r}
+printcp(fit1)
+
+prfit2 <- prune(fit1, 0.03)
+
+rpart.plot(prfit2)
+```
+
+### Get the predicted values and compute the r squared
+
+```{r}
+prpred2 <- predict(prfit2, cp_test)
+
+mse <- sum((prpred2 - cp_test$salary)^2)/237
+
+var.y <- sum((cp_test$salary - mean(cp_test$salary))^2)/236
+
+rsq <- 1 - mse/var.y
+
+rsq
+```

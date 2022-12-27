@@ -1,0 +1,162 @@
+---
+title: "Neural Networks"
+author: "Ismael Isak"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# The Data
+
+We will use the popular Boston dataset from the MASS package, which describes some features for houses in Boston in 1978.
+
+```{r include=FALSE}
+Name <- c("CRIM", "ZN", "INDUS", "CHAS", "NOX", "RM", "AGE", "DIS", "RAD","TAX", "PTRATIO", "B", "LSTAT", "MEDV")
+
+nDescription <- c("per capita crime rate by town",
+"proportion of residential land zoned for lots over 25,000 sq.ft.",
+"proportion of non-retail business acres per town.",
+ "Charles River dummy variable (1 if tract bounds river; 0 otherwise)",
+"nitric oxides concentration (parts per 10 million)",
+"average number of rooms per dwelling",
+"proportion of owner-occupied units built prior to 1940",
+"weighted distances to five Boston employment centres",
+"index of accessibility to radial highways",
+ "full-value property-tax rate per 10,000 dollars",
+"pupil-teacher ratio by town",
+"1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town",
+"% lower status of the population",
+"Median value of owner-occupied homes in $1000's")
+
+library(flextable)
+
+set_flextable_defaults(fonts_ignore=TRUE)
+
+definition_df <- data.frame(Name = Name, Description = nDescription, check.names = FALSE)
+```
+
+```{r}
+flextable::flextable(definition_df,cwidth = c(2.5,4.5))
+```
+
+
+We will be trying to predict the Median Value MEDV  
+
+```{r}
+library(MASS)
+
+set.seed(101)
+data <- Boston
+
+str(data)
+
+summary(data)
+
+head(data)
+
+any(is.na(data))
+```
+
+
+# Neural Net Model
+
+First you'll need to install the neural net library:
+
+```{r}
+library(neuralnet)
+```
+
+# Training the Model
+
+As a first step, we are going to address data preprocessing. It is good practice to normalize your data before training a neural network. Depending on your dataset, avoiding normalization may lead to useless results or to a very difficult training process (most of the times the algorithm will not converge before the number of maximum iterations allowed). You can choose different methods to scale the data (z-normalization, min-max scale, etc…). Usually scaling in the intervals [0,1] or [-1,1] tends to give better results. We therefore scale and split the data before moving on:
+
+```{r}
+maxs <- apply(data, 2, max) 
+mins <- apply(data, 2, min)
+
+maxs
+
+mins
+
+scaled <- as.data.frame(scale(data, center = mins, scale = maxs - mins))
+
+head(scaled)
+```
+
+
+# Train and Test Sets
+
+Now with our standardized data, let's split it:
+
+```{r}
+library(caTools)
+split = sample.split(scaled$medv, SplitRatio = 0.70)
+
+train = subset(scaled, split == TRUE)
+test = subset(scaled, split == FALSE)
+```
+
+
+# Training the Model
+
+```{r}
+# Call package
+library(neuralnet)
+
+nn <- neuralnet(medv ~ crim + zn + indus + chas + nox + rm + age + dis + rad + 
+    tax + ptratio + black + lstat
+,data=train,hidden=c(5,3),linear.output=TRUE)
+```
+
+# Neural Net Visualization
+
+You can plot out your model to see a very neat visualization with the weights on each connection.
+
+The black lines show the connections between each layer and the weights on each connection while the blue lines show the bias term added in each step. The bias can be thought as the intercept of a linear model. The net is essentially a black box so we cannot say that much about the fitting, the weights and the model. Suffice to say that the training algorithm has converged and therefore the model is ready to be used.
+
+```{r}
+plot(nn)
+```
+
+
+# Predictions using the Model
+
+Now we can try to predict the values for the test set and calculate the MSE. Remember that the net will output a normalized prediction, so we need to scale it back in order to make a meaningful comparison (or just a simple prediction).
+
+```{r}
+# Compute Predictions off Test Set
+predicted.nn.values <- compute(nn,test[1:13])
+
+# Its a list returned
+str(predicted.nn.values)
+
+# Convert back to non-scaled predictions
+true.predictions <- predicted.nn.values$net.result*(max(data$medv)-min(data$medv))+min(data$medv)
+
+# Convert the test data
+test.r <- (test$medv)*(max(data$medv)-min(data$medv))+min(data$medv)
+
+# Check the Mean Squared Error
+MSE.nn <- sum((test.r - true.predictions)^2)/nrow(test)
+
+MSE.nn
+```
+
+
+# Visualize Error
+
+```{r}
+error.df <- data.frame(test.r,true.predictions)
+
+head(error.df)
+
+library(ggplot2)
+ggplot(error.df,aes(x=test.r,y=true.predictions)) + geom_point() + stat_smooth()
+```
